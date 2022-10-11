@@ -29,7 +29,15 @@ alias r='sudo systemd-nspawn -bni mkosi.output/image.raw --machine=$id'
 alias t='gtags -v'
 EOF
 
-git restore mkosi.postinst
+git restore ./mkosi.default.d/fedora/10-mkosi.fedora
+pkgs="ldns-utils bind-utils net-tools tcpdump screen iputils passwd gdb-gdbserver traceroute unbound-libs"
+pkgs_2=
+for pkg in $pkgs; do
+    pkgs_2="${pkgs_2}\ \ \ \ \ \ \ \ $pkg\n"
+done
+sed -i "/^Packages=/a $pkgs_2" ./mkosi.default.d/fedora/10-mkosi.fedora
+
+git restore ./mkosi.postinst
 cat <<EOF >> ./mkosi.postinst
 
 if [[ "$1" == final ]]; then
