@@ -1,0 +1,69 @@
+#!/bin/sh
+
+set -e
+
+usage() {
+    printf "Usage: %s: [-i ghID|-i bzID]\n" $0
+    exit 2
+}
+
+id=
+while getopts i: name
+do
+    case $name in
+        i) id="$OPTARG";;
+        ?) usage;;
+    esac
+done
+prefix=$(echo $id | awk '{print substr($0,1,2)}')
+[ $prefix != "bz" -a $prefix != "gh" ] && usage
+
+echo "helper" >> ./.git/info/exclude
+
+cat <<EOF > ./helper
+alias a='sudo machinectl shell $id'
+alias b='sudo mkosi -i -f'
+alias bb='sudo mkosi -i -ff'
+alias q='qemu-kvm -m 512 -smp 2 -bios /usr/share/edk2/ovmf/OVMF_CODE.fd -drive format=raw,file=image.raw -nographic'
+alias r='sudo systemd-nspawn -bni mkosi.output/image.raw --machine=$id'
+alias t='gtags -v'
+EOF
+
+git restore mkosi.postinst
+cat <<EOF >> ./mkosi.postinst
+
+if [[ "$1" == final ]]; then
+    systemctl enable systemd-resolved
+fi
+EOF
+
+mkdir -p ./mkosi.extra/etc/systemd/system/systemd-resolved.service.d
+cat <<EOF > ./mkosi.extra/etc/systemd/system/systemd-resolved.service.d/override.conf
+[Service]
+Environment=SYSTEMD_LOG_LEVEL=debug
+WatchdogSec=0
+EOF
+
+mkdir -p ./mkosi.extra/usr/lib/systemd/network
+cat <<EOF > ./mkosi.extra/usr/lib/systemd/network/80-container-host0.network
+[Match]
+Virtualization=container
+Name=host0
+
+[Network]
+Address=192.168.254.2/30
+Gateway=192.168.254.1
+EOF
+
+sudo touch /lib/systemd/network/79-$id-ve.network
+sudo chown $USER: /lib/systemd/network/79-$id-ve.network
+cat <<EOF > /lib/systemd/network/79-$id-ve.network
+[Match]
+Name=ve-$id
+Driver=veth
+
+[Network]
+Address=192.168.254.1/30
+EOF
+sudo systemctl daemon-reload
+sudo systemctl restart systemd-networkd
