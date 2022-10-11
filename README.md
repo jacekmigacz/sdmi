@@ -1,0 +1,2 @@
+# sdmi
+systemd-mkosi-init
