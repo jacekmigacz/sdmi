@@ -40,7 +40,7 @@ sed -i "/^Packages=/a $pkgs_2" ./mkosi.default.d/fedora/10-mkosi.fedora
 git restore ./mkosi.postinst
 cat <<EOF >> ./mkosi.postinst
 
-if [[ "$1" == final ]]; then
+if [[ "\$1" == final ]]; then
     systemctl enable systemd-resolved
 fi
 EOF
