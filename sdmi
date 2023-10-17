@@ -1,6 +1,7 @@
 #!/bin/sh
 
 set -e
+set -x
 
 usage() {
     printf "Usage: %s: [-i ghID|-i bzID]\n" $0
@@ -24,20 +25,37 @@ cat <<EOF > ./helper
 alias a='sudo machinectl shell $id'
 alias b='sudo mkosi -i -f'
 alias bb='sudo mkosi -i -ff'
-alias q='qemu-kvm -m 512 -smp 2 -bios /usr/share/edk2/ovmf/OVMF_CODE.fd -drive format=raw,file=image.raw -nographic'
-alias r='sudo systemd-nspawn -bni mkosi.output/image.raw --machine=$id'
+alias q='qemu-kvm -m 512 -smp 2 -bios /usr/share/edk2/ovmf/OVMF_CODE.fd -drive format=raw,file=$(find mkosi.output -name image.raw) -nographic'
+alias r='sudo systemd-nspawn -bni $(find mkosi.output -name image.raw) --machine=$id'
 alias t='gtags -v'
 EOF
 
-git restore ./mkosi.default.d/fedora/10-mkosi.fedora
+optfile=
+if [ -e ./mkosi.default ]; then
+    optfile=./mkosi.default
+elif [ -e ./mkosi.default.d/fedora/10-mkosi.fedora ]; then
+    optfile=./mkosi.default.d/fedora/10-mkosi.fedora
+elif [ -e ./mkosi.conf.d/fedora/10-mkosi.fedora ]; then
+    optfile=./mkosi.conf.d/fedora/10-mkosi.fedora
+elif [ -e ./mkosi.conf.d/fedora/10-fedora.conf ]; then
+    optfile=./mkosi.conf.d/fedora/10-fedora.conf
+else
+    exit 1
+fi
+git restore $optfile
 pkgs="ldns-utils bind-utils net-tools tcpdump screen iputils passwd gdb-gdbserver traceroute unbound-libs"
 pkgs_2=
 for pkg in $pkgs; do
     pkgs_2="${pkgs_2}\ \ \ \ \ \ \ \ $pkg\n"
 done
-sed -i "/^Packages=/a $pkgs_2" ./mkosi.default.d/fedora/10-mkosi.fedora
+sed -i "/^Packages=/a $pkgs_2" $optfile
 
-git restore ./mkosi.postinst
+if git ls-files --error-unmatch ./mkosi.postinst 2>/dev/null; then
+    git restore ./mkosi.postinst
+else
+    echo -n "" > ./mkosi.postinst
+    chmod +x ./mkosi.postinst
+fi
 cat <<EOF >> ./mkosi.postinst
 
 if [[ "\$1" == final ]]; then
